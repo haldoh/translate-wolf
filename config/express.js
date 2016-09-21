@@ -17,6 +17,8 @@ var morgan = require('morgan');
 var cors = require('cors');
 var request = require('request');
 
+var translate = require('../controllers/translate');
+
 var logger = require('./logger');
 var config = require('./config');
 
@@ -72,34 +74,7 @@ module.exports = function () {
 	app.use('/translate', require('../routes/translate'));
 
 	// Special 404 management
-	app.use(function (req, res, next) {
-
-		// Request options
-		var options = {
-			url: req.session.lastReqDomain + req.url,
-			strictSSL: false,
-			maxRedirects: 8
-		};
-
-		return request(options, function (err, resp, body) {
-
-			if (err) {
-				logger.warn('404 management - error trying to find missing content: ' + err);
-				return next();
-			} else {
-
-				var respCode = resp && resp.statusCode ? resp.statusCode : 500;
-
-				if (respCode < 200 && respCode > 399) {
-					logger.warn('404 management - bad response code from page: ' + respCode + ' - response: ' + JSON.stringify(resp));
-					return next();
-				} else {
-					//Return page content
-					return res.status(200).send(body);
-				}
-			}
-		});
-	});
+	app.use(translate.manage404Translate);
 
 	/*
 	 * HTTP server setup
