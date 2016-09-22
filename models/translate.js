@@ -14,7 +14,7 @@ var cheerio = require('cheerio');
 
 var logger = require('../config/logger');
 
-module.exports.translateAndSend = function (res, body) {
+module.exports.translate = function (body, callback) {
 	
 	// Load content
 	var $ = cheerio.load(body);
@@ -29,5 +29,5 @@ module.exports.translateAndSend = function (res, body) {
 	}).parent().css({'color': 'yellow'});
 
 	//Return page content
-	res.status(200).send($.html());
+	return callback($.html());
 };

@@ -13,6 +13,7 @@
 var request = require('request');
 var cheerio = require('cheerio');
 var urlTool = require('url');
+var async = require('async');
 
 var translate = require('../models/translate');
 
@@ -36,7 +37,12 @@ module.exports.translate = function (req, res, next) {
 		var options = {
 			url: url,
 			strictSSL: false,
-			maxRedirects: 8
+			maxRedirects: 8,
+			headers: {
+				'Cache-Control': 'no-cache, no-store, must-revalidate',
+				'Pragma': 'no-cache',
+				'Expires': 0
+			}
 		};
 
 		// Visit page
@@ -54,11 +60,17 @@ module.exports.translate = function (req, res, next) {
 					res.status(respCode).send(resp);
 				} else {
 
-					// Replace absolute URLs
-					return replaceUrls(req, body, function (newBody) {
-					
-						// Translate content and send back
-						return translate.translateAndSend(res, newBody);
+					// Replace references to style and js files
+					return replaceExtFiles(req, body, function (extBody) {
+
+						// Replace URLs
+						return replaceUrls(req, extBody, function (urlBody) {
+						
+							// Translate content and send back
+							return translate.translate(urlBody, function (transBody) {
+								res.status(200).send(transBody);
+							});
+						});
 					});
 				}
 			}
@@ -75,7 +87,12 @@ module.exports.manage404Translate = function (req, res, next) {
 	var options = {
 		url: req.session.lastReqDomain + req.url,
 		strictSSL: false,
-		maxRedirects: 8
+		maxRedirects: 8,
+		headers: {
+			'Cache-Control': 'no-cache, no-store, must-revalidate',
+			'Pragma': 'no-cache',
+			'Expires': 0
+		}
 	};
 
 	return request(options, function (err, resp, body) {
@@ -92,11 +109,17 @@ module.exports.manage404Translate = function (req, res, next) {
 				return next();
 			} else {
 				
-				// Replace absolute URLs
-				return replaceUrls(req, body, function (newBody) {
+				// Replace references to style and js files
+				return replaceExtFiles(req, body, function (extBody) {
+
+					// Replace URLs
+					return replaceUrls(req, extBody, function (urlBody) {
 					
-					// Translate content and send back
-					return translate.translateAndSend(res, newBody);
+						// Translate content and send back
+						return translate.translate(urlBody, function (transBody) {
+							res.status(200).send(transBody);
+						});
+					});
 				});
 			}
 		}
@@ -104,37 +127,108 @@ module.exports.manage404Translate = function (req, res, next) {
 };
 
 // Replace URLs in a page with the translation URL
-var replaceUrls = function (req, body, callback) {
+var replaceUrls = function (req, body, done) {
 
 	// Load content
 	var $ = cheerio.load(body);
 
-	// Counters for a elements selection and substitution
-	var counterCheck = 0;
-	var counterExec = 0;
+	var aColl = $('a').filter(function(i, el) {
+			return (
+				$(this).attr('href') &&
+				(
+					$(this).attr('href').indexOf('http') === 0 ||
+					$(this).attr('href').indexOf('/') === 0
+				)
+			);
+		});
 
-	// Select all the a elements
-	$('a').filter(function(i, el) {
+	// Use async to go through the URLs, change them,
+	// and return the changed HTML code when done
+	async.each(
+		// Collection of a elements to iterate
+		aColl,
+		// Substitution function
+		function (item, callback) {
+		
+			async.setImmediate(function () {
 
-		// Increment check counter
-		counterCheck += 1;
+				if ($(item).attr('href').indexOf('http') === 0) {
+					// Replace for absolute URLs
+					$(item).attr('href', req.protocol + '://' + req.get('host') + '/translate?url=' + $(item).attr('href'));
+				} else if ($(item).attr('href').indexOf('/') === 0) {
+					// Replace for relative URLs
+					$(item).attr('href', req.protocol + '://' + req.get('host') + '/translate?url=' + req.session.lastReqDomain + $(item).attr('href'));
+				}
+				
+				// Done
+				callback();
+			});
+		},
+		// Done function
+		function (err) {
+			if (err)
+				logger.warn('Async library error while replacing URLs: ' + err);
+			done($.html());
+		}
+	);
+};
 
-		// logger.debug('This: ' + $(this).parent().html());
-		// logger.debug('href: ' + $(this).attr('href'));
-		
-		return true;
-	}).each(function () {
-		
-		// Replace URL
-		$(this).attr('href', 'http://' + req.get('host') + '/translate?url=' + $(this).attr('href'));
-		
-		// Increment execution counter
-		counterExec += 1;
-		logger.debug('Checking counters: ' + counterExec + '/' + counterCheck);
-		if (counterExec >= counterCheck)
-			return callback($.html());
+// Replace URLs in a page with the translation URL
+var replaceExtFiles = function (req, body, done) {
+
+	// Load content
+	var $ = cheerio.load(body);
+
+	// Get link elements with external ref
+	var linkColl = $('link[href]');
+
+	// Get script elements with external ref
+	var scriptColl = $('script[src]');
+
+	// Put all replacement tasks in an array for async execution
+	var asyncTasks = [];
+
+	// Links tasks
+	linkColl.each(function (i, item) {
+
+		asyncTasks.push(function (callback) {
+
+			async.setImmediate(function () {
+				// Change only relative URLs
+				if ($(item).attr('href') && $(item).attr('href').indexOf('http') !== 0) {
+					var prefix = req.session.lastReqDomain;
+					prefix += $(item).attr('href').indexOf('/') === 0 ? '' : '/';
+					$(item).attr('href', prefix + $(item).attr('href'));
+				}
+
+				// Done
+				callback();
+			});
+		});
 	});
 
-	if (counterCheck === 0 && counterExec === 0)
-		return callback(body);
+	// Scripts tasks
+	scriptColl.each(function (i, item) {
+
+		asyncTasks.push(function (callback) {
+
+			async.setImmediate(function () {
+				// Change only relative URLs
+				if ($(item).attr('src') && $(item).attr('src').indexOf('http') !== 0) {
+					var prefix = req.session.lastReqDomain;
+					prefix += $(item).attr('src').indexOf('/') === 0 ? '' : '/';
+					$(item).attr('src', prefix + $(item).attr('src'));
+				}
+
+				// Done
+				callback();
+			});
+		});
+	});
+
+	// Run tasks
+	async.parallel(asyncTasks, function () {
+		// Done
+		done($.html());
+	});
 };

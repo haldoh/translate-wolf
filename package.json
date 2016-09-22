@@ -13,6 +13,7 @@
   "author": "Aldo Ambrosioni",
   "license": "MIT",
   "dependencies": {
+    "async": "^2.0.1",
     "body-parser": "^1.15.0",
     "cheerio": "^0.19.0",
     "cors": "^2.7.1",
