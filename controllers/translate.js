@@ -85,7 +85,7 @@ var requestAndTranslate = function (reqProtocol, reqHost, reqLastDomain, url, ca
 
 			if (respCode < 200 && respCode > 399) {
 				callback(new Error('Bad response code from page: ' + respCode + ' - response: ' + JSON.stringify(resp)), null);
-			} else {
+			} else {	
 
 				// Replace references to style and js files
 				return replaceExtFiles(reqLastDomain, body, function (extBody) {
@@ -93,9 +93,13 @@ var requestAndTranslate = function (reqProtocol, reqHost, reqLastDomain, url, ca
 					// Replace URLs
 					return replaceUrls(reqProtocol, reqHost, reqLastDomain, extBody, function (urlBody) {
 					
-						// Translate content and send back
-						return translate.translate(urlBody, function (transBody) {
-							callback(null, transBody);
+						// Add custom files (JS, CSS, etc...)
+						return translate.addCustomFiles(reqProtocol, reqHost, urlBody, function (styleBody) {
+
+							// Translate content and send back
+							return translate.translate(styleBody, function (transBody) {
+								callback(null, transBody);
+							});
 						});
 					});
 				});

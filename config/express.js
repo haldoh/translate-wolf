@@ -13,6 +13,7 @@
 var express = require('express');
 var session = require('express-session');
 var bodyParser = require('body-parser');
+var serveStatic = require('serve-static');
 var morgan = require('morgan');
 var cors = require('cors');
 var request = require('request');
@@ -64,6 +65,11 @@ module.exports = function () {
 		methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
 		credentials: true,
 		allowedHeaders: 'X-Requested-With, X-HTTP-Method-Override, Content-Type, Accept'
+	}));
+
+	// Static files (CSS, JS, etc...)
+	app.use(serveStatic('./public', {
+		index: false
 	}));
 
 	// Documentation - static
