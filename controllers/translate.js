@@ -15,6 +15,9 @@ var cheerio = require('cheerio');
 var urlTool = require('url');
 var async = require('async');
 
+var charset = require('charset');
+var jschardet = require('jschardet');
+var iconv = require('iconv-lite');
 
 var translate = require('../models/translate');
 
@@ -66,6 +69,7 @@ var requestAndTranslate = function (reqProtocol, reqHost, reqLastDomain, url, ca
 	// Request options
 	var options = {
 		url: url,
+		encoding: 'binary',
 		strictSSL: false,
 		maxRedirects: 8,
 		headers: {
@@ -88,8 +92,22 @@ var requestAndTranslate = function (reqProtocol, reqHost, reqLastDomain, url, ca
 				callback(new Error('Bad response code from page: ' + respCode + ' - response: ' + JSON.stringify(resp)), null);
 			} else {	
 
+				// Decode page content
+				var bodyEnc = body;
+				var enc = charset(resp.headers, body);
+				enc = enc || jschardet.detect(body).encoding || 'utf-8';
+				enc = enc.toLowerCase();
+				if (enc) {
+					try {
+						bodyEnc = iconv.decode(new Buffer(body, 'binary'), enc).toString('utf-8');
+					} catch (err) {
+						// Do not convert if an error is thrown
+						logger.debug('Decoding error silenced: ' + err);
+					}
+				}
+
 				// Replace references to style and js files
-				return replaceExtFiles(reqLastDomain, body, function (extBody) {
+				return replaceExtFiles(reqLastDomain, bodyEnc, function (extBody) {
 
 					// Replace URLs
 					return replaceUrls(reqProtocol, reqHost, reqLastDomain, extBody, function (urlBody) {
