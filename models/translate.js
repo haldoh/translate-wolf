@@ -21,7 +21,7 @@ module.exports.translate = function (body, done) {
 	var $ = cheerio.load(body);
 
 	// Get all text elements matching the given filter
-	var textElems = $('div * :not(script)')
+	var textElems = $('body * :not(script)')
 		.contents()
 		.filter(function(i, el) {
 			if ((this.nodeType === 3) && (this.nodeValue.trim().length > 5)) {
@@ -31,17 +31,33 @@ module.exports.translate = function (body, done) {
 			}
 		});
 
-	// Use async to prcess elements
+	// Use async to process elements
 	async.each(
 		textElems,
 		function (item, callback) {
 
 			async.setImmediate(function () {
 
-				// Process item
-				$(item).parent()
-					.addClass('already-here')
-					.attr('data-tooltip', $(item).text());
+				// Check parent's parent contents
+				var parentContent = $(item)
+					.parent()
+					.parent()
+					.contents()
+					.filter(function(i, el) {
+						if ((this.nodeType === 3) && (this.nodeValue.trim().length > 5)) {
+							return true;
+						} else {
+							return false;
+						}
+					});
+
+				if (parentContent.length <= 0) {
+					// Process item
+					$(item)
+						.parent()
+						.addClass('already-here')
+						.attr('data-tooltip', $(item).parent().html().replace(/<[a-zA-Z\/][^>]*>/g, ' ').trim());
+				}
 				
 				// Done
 				return callback();
