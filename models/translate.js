@@ -41,7 +41,7 @@ module.exports.translate = function (body, done) {
 				// Process item
 				$(item).parent()
 					.addClass('already-here')
-					.append('<span class="added-later">' + $(item).text() + '</div>');
+					.attr('data-tooltip', $(item).text());
 				
 				// Done
 				return callback();
@@ -59,6 +59,9 @@ module.exports.addCustomFiles = function (reqProtocol, reqHost, body, callback) 
 	// Load content
 	var $ = cheerio.load(body);
 
+	// Add reference to qTip style file
+	$('head').append('<link rel="stylesheet" type="text/css" href="' + reqProtocol + '://' + reqHost + '/stylesheets/jquery.qtip.min.css"/>');
+
 	// Add reference to custom style file
 	$('head').append('<link rel="stylesheet" type="text/css" href="' + reqProtocol + '://' + reqHost + '/stylesheets/translate-wolf.css"/>');
 
@@ -66,6 +69,9 @@ module.exports.addCustomFiles = function (reqProtocol, reqHost, body, callback) 
 	var jqueryScripts = $('script[src*=jquery]');
 	if (jqueryScripts.length === 0)
 		$('body').append('<script type="text/javascript" src="' + reqProtocol + '://' + reqHost + '/javascripts/lib/jquery-2.1.1.min.js"/>');
+
+	// Add reference to qTip js script
+	$('body').append('<script type="text/javascript" src="' + reqProtocol + '://' + reqHost + '/javascripts/lib/jquery.qtip.min.js"/>');
 
 	// Add reference to custom js script
 	$('body').append('<script type="text/javascript" src="' + reqProtocol + '://' + reqHost + '/javascripts/translate-wolf.js"/>');

@@ -1,9 +1,3 @@
-.added-later {
-	position: absolute;
-	top: 0px;
-	left: 0px;
-	background-color: gray;
-	opacity: 0.5;
-	visibility: hidden;
-	z-index: -100;
+.already-here:hover {
+	background-color: LightGray;
 }

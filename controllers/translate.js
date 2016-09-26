@@ -15,6 +15,7 @@ var cheerio = require('cheerio');
 var urlTool = require('url');
 var async = require('async');
 
+
 var translate = require('../models/translate');
 
 var logger = require('../config/logger');
